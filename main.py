@@ -6,8 +6,22 @@ from datetime import datetime
 import pandas as pd
 from playwright.sync_api import sync_playwright, expect, TimeoutError
 from io import StringIO
+import logging
+from rich.logging import RichHandler
+from rich.console import Console
+from rich.progress import track
 
 def main():
+    # Setup logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(message)s",
+        datefmt="[%X]",
+        handlers=[RichHandler()]
+    )
+    logger = logging.getLogger("dgw-scrapper")
+    console = Console()
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--email', required=True, help='Email')
     parser.add_argument('--password', required=True, help='Password')
@@ -19,6 +33,7 @@ def main():
     email = args.email.strip(string.whitespace + string.punctuation)
     password = args.password.strip(string.whitespace + string.punctuation)
 
+    logger.info("Launching browser and logging in...")
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         context = browser.new_context()
@@ -32,6 +47,7 @@ def main():
         page.get_by_role('button', name='Login').click()
         page.wait_for_url('https://spartan.dgw.co.id/')
 
+        logger.info("Navigating to Inbox...")
         page.get_by_role('button', name='Inbox').click()
         page.wait_for_url('https://spartan.dgw.co.id/inbox/')
 
@@ -78,10 +94,13 @@ def main():
         folder_path = 'output'
         os.makedirs(folder_path, exist_ok=True)
 
+        logger.info("Cleaning output folder...")
         for file_path in glob.glob(os.path.join(folder_path, '*')):
             os.remove(file_path)
 
-        for index, item in enumerate(ul.locator('li').all()):
+        items = ul.locator('li').all()
+        logger.info(f"Found {len(items)} items to process.")
+        for index, item in enumerate(track(items, description="Processing items...")):
             code = item.locator("xpath=/div/div/div[2]/div[1]/p[2]").inner_html()
             item.click()
             expect(page.get_by_role("heading", name=code)).to_be_visible()
@@ -127,7 +146,9 @@ def main():
 
                 output_path = os.path.join(folder_path, f"{filename}.xlsx")
                 df.to_excel(output_path, index=False)
+                logger.info(f"Saved: {output_path}")
             except TimeoutError:
+                logger.warning(f"TimeoutError for item {index+1}: {filename}")
                 continue
 
 

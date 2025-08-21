@@ -1,0 +1,41 @@
+name: Run Scrapper
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: 'Email'
+        required: true
+      password:
+        description: 'Password'
+        required: true
+      from_date:
+        description: 'From date (DD/MM/YYYY)'
+        required: true
+      to_date:
+        description: 'To date (DD/MM/YYYY)'
+        required: true
+
+jobs:
+  run-scrapper:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: pip install -r requirements.txt rich
+      - name: Run scrapper
+        run: |
+          python main.py \
+            --email "${{ github.event.inputs.email }}" \
+            --password "${{ github.event.inputs.password }}" \
+            --from_date "${{ github.event.inputs.from_date }}" \
+            --to_date "${{ github.event.inputs.to_date }}"
+      - name: Upload output files
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrapper-output
+          path: output/*.xlsx
